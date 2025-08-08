@@ -11,58 +11,76 @@ from pathlib import Path
 import shutil
 import csv
 
-# 1. change the folder path to the folder you want to archive:   Path(r"xzyz\xyz\xyz")
-SOURCE_FOLDER = Path(r"C:\Users\klara.orban\OneDrive - Reformierte Kirchen Bern Jura Solothurn\Dokumente\Programming\Archivate Old Files\test_dataset")
+def archivate_files(source_folder, destination_folder, concr_date_str, csv_name):
+    if isinstance(concr_date_str, (datetime.date, datetime.datetime)):
+        concr_date_str = concr_date_str.strftime("%Y.%m.%d")
+    else:
+        concr_date_str = concr_date_input
+    # 1. change the folder path to the folder you want to archive:   Path(r"xzyz\xyz\xyz")
+    SOURCE_FOLDER = Path(source_folder)
 
-# 2. change the destination folder path to the folder you want to archive to:   Path(r"xzyz\xyz\xyz")
-DESTINATION = Path(r"C:\Users\klara.orban\OneDrive - Reformierte Kirchen Bern Jura Solothurn\Dokumente\Programming\Archived")
+    # 2. change the destination folder path to the folder you want to archive to:   Path(r"xzyz\xyz\xyz")
+    DESTINATION = Path(destination_folder)
 
-# 3. change the age in years to the age you want to archive files older than
-AGE = 5
+    # # 3. change the age in years to the age you want to archive files older than
+    # AGE = int(age_years)
+    
+    # 3.2 concrete date in YYYY-MM-DD format or YYYY.MM.DD or YYYY/MM/DD, if not the correct format, it will raise an error
+    concrete_date = None
+    format_options = ["%Y-%m-%d", "%Y.%m.%d", "%Y/%m/%d"]
+    for fmt in format_options:
+        try:
+            concrete_date = datetime.datetime.strptime(concr_date_str, fmt)
+            break
+        except ValueError:
+            continue
 
-# 4. this is the logs file where the original path, archived path, last modified date and archived date will be saved
-LOG_PATH = Path("archivation_log.csv")
+    if concrete_date is None:
+        raise ValueError("Date format must be YYYY-MM-DD, YYYY.MM.DD, or YYYY/MM/DD")
+    
+    # 4. this is the logs file where the original path, archived path, last modified date and archived date will be saved
+    if not csv_name.lower().endswith(".csv"):
+        csv_name += ".csv"
+    
+    LOG_PATH = DESTINATION / csv_name
+
+    DESTINATION.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.datetime.now()
+
+    col_names = ["original_path", "archived_path", "last_modified","archived_date", "size"]
+
+    log = LOG_PATH.exists()
+    log_file = LOG_PATH.open("a", newline='', encoding='utf-8')
+    csv_writer = csv.DictWriter(log_file, fieldnames=col_names)
+    
+    if not log:
+        csv_writer.writeheader()
+
+    for file in SOURCE_FOLDER.rglob("*"):
+        if file.is_file():
+            last_mod_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
+
+            if last_mod_time <= concrete_date:
+                relative_path = file.relative_to(SOURCE_FOLDER)
+                target_path = DESTINATION / relative_path
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                size = file.stat().st_size
+                last_modif_2 = last_mod_time.strftime("%Y-%m-%d %H:%M:%S")
+                archived_date = now.strftime("%Y-%m-%d %H:%M:%S")
 
 
-DESTINATION.mkdir(exist_ok=True)
+                csv_writer.writerow({
+                    "original_path": str(file),
+                    "archived_path": str(target_path),
+                    "last_modified": last_modif_2,
+                    "archived_date": archived_date,
+                    "size": size
+                })
 
-now = datetime.datetime.now()
-minimal_age = now - datetime.timedelta(days=AGE*365)
+                shutil.move(str(file), str(target_path))
+                print(f"Moved {file} to {target_path}")
+            
 
-col_names = ["original_path", "archived_path", "last_modified","archived_date", "size"]
-
-log = LOG_PATH.exists()
-log_file = LOG_PATH.open("a", newline='', encoding='utf-8')
-csv_writer = csv.DictWriter(log_file, fieldnames=col_names)
-if not log:
-    csv_writer.writeheader()
-
-
-
-for file in SOURCE_FOLDER.rglob("*"):
-    if file.is_file():
-        last_mod_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
-
-        if last_mod_time < minimal_age:
-            relative_path = file.relative_to(SOURCE_FOLDER)
-            target_path = DESTINATION / relative_path
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            size = file.stat().st_size
-            last_modif_2 = last_mod_time.strftime("%Y-%m-%d %H:%M:%S")
-            archived_date = now.strftime("%Y-%m-%d %H:%M:%S")
-
-
-            csv_writer.writerow({
-                "original_path": str(file),
-                "archived_path": str(target_path),
-                "last_modified": last_modif_2,
-                "archived_date": archived_date,
-                "size": size
-            })
-
-            shutil.move(str(file), str(target_path))
-            print(f"Moved {file} to {target_path}")
-        
-
-log_file.close()
-print("Done scanning archives! All archives saved to archive folder")
+    log_file.close()
+    print("Done scanning archives! All archives saved to archive folder")

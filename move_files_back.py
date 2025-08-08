@@ -7,21 +7,23 @@ import shutil
 
 LOG_PATH = Path(r"archivation_log.csv")
 
-with LOG_PATH.open("r", encoding="utf-8") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        archived = Path(row["archived_path"])
-        original = Path(row["original_path"])
+def restore_files(log_path):
+    LOG_PATH = Path(log_path)
+    with LOG_PATH.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            archived = Path(row["archived_path"])
+            original = Path(row["original_path"])
 
-        if archived.exists():
-            original.parent.mkdir(parents=True, exist_ok=True)
+            if archived.exists():
+                original.parent.mkdir(parents=True, exist_ok=True)
 
-            try:
-                shutil.move(str(archived), str(original))
-                print(f"Moved {archived} to {original}  -- original place")
-            except Exception as e:
-                print(f"Failed move {archived} to {original} -- {e}")
-        else:
-            print(f"Archived file not found: {archived}")
+                try:
+                    shutil.move(str(archived), str(original))
+                    print(f"Moved {archived} to {original}  -- original place")
+                except Exception as e:
+                    print(f"Failed move {archived} to {original} -- {e}")
+            else:
+                print(f"Archived file not found: {archived}")
 
-print("Vertig")
+    print("Vertig")
